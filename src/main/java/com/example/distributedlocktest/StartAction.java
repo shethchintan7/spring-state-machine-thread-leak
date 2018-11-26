@@ -15,12 +15,14 @@ public class StartAction implements Action<StateMachineConfig.States, StateMachi
     @Override
     @Transactional
     public void execute(StateContext<StateMachineConfig.States, StateMachineConfig.Events> context) {
-        try {
-            log.info("calculating something for 30 sec.. ");
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        for (int i = 0; i < 3; i++) {
+            log.info("In start action {} {}", i, context.getStateMachine().getId());
+            try {
+                Thread.sleep(10000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
         }
-        context.getStateMachine().sendEvent(StateMachineConfig.Events.GO);
     }
 }

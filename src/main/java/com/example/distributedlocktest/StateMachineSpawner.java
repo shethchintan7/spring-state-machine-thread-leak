@@ -25,7 +25,7 @@ public class StateMachineSpawner {
         //     This depends on how much time our ACTION class is blocking..
         //     Ideally our action should just trigger http calls to NiFi and must return as soon as possible
         //     So we should be fine having just around 50 to 100 threads.
-        ScheduledThreadPoolExecutor threadPool = new ScheduledThreadPoolExecutor(1
+        ScheduledThreadPoolExecutor threadPool = new ScheduledThreadPoolExecutor(10
                 , new CustomizableThreadFactory("my-pool-"));
         ConcurrentTaskScheduler taskScheduler = new ConcurrentTaskScheduler(threadPool);
         return taskScheduler;
@@ -38,12 +38,12 @@ public class StateMachineSpawner {
 
     @PostConstruct
     void postConstruct() throws Exception {
-        for (int i = 0; i < 10; i++) {
-            try {
-                Thread.sleep(3);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        for (int i = 0; i < 2; i++) {
+//            try {
+//                Thread.sleep(100);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
             StateMachineBuilder.Builder<StateMachineConfig.States, StateMachineConfig.Events> builder = StateMachineBuilder.builder();
 
             /* (1)
@@ -67,11 +67,9 @@ public class StateMachineSpawner {
 
             builder.configureTransitions()
                     .withExternal()
-                    .source(StateMachineConfig.States.START).target(StateMachineConfig.States.STOP).event(StateMachineConfig.Events.GO);
-
+                    .source(StateMachineConfig.States.START).target(StateMachineConfig.States.START).timer(1000);
             StateMachine stateMachine = builder.build();
             stateMachine.start();
-            stateMachine.stop();
         }
     }
 }
