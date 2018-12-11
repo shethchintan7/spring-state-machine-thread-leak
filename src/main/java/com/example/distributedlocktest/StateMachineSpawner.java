@@ -18,6 +18,12 @@ public class StateMachineSpawner {
     @Autowired
     StartAction startAction;
 
+    @Autowired
+    StopAction stopAction;
+
+    @Autowired
+    IntermediateAction intermediateAction;
+
     //(4) This is correct way to create BEAN, This can be any ()other  @Configuration bean
     @Bean(name = "stateMachineTaskScheduler")
     public ConcurrentTaskScheduler stateMachineTaskScheduler() {
@@ -25,7 +31,7 @@ public class StateMachineSpawner {
         //     This depends on how much time our ACTION class is blocking..
         //     Ideally our action should just trigger http calls to NiFi and must return as soon as possible
         //     So we should be fine having just around 50 to 100 threads.
-        ScheduledThreadPoolExecutor threadPool = new ScheduledThreadPoolExecutor(10
+        ScheduledThreadPoolExecutor threadPool = new ScheduledThreadPoolExecutor(100
                 , new CustomizableThreadFactory("my-pool-"));
         ConcurrentTaskScheduler taskScheduler = new ConcurrentTaskScheduler(threadPool);
         return taskScheduler;
@@ -38,12 +44,7 @@ public class StateMachineSpawner {
 
     @PostConstruct
     void postConstruct() throws Exception {
-        for (int i = 0; i < 2; i++) {
-//            try {
-//                Thread.sleep(100);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
+        for (int i = 0; i < 1; i++) {
             StateMachineBuilder.Builder<StateMachineConfig.States, StateMachineConfig.Events> builder = StateMachineBuilder.builder();
 
             /* (1)
@@ -51,25 +52,58 @@ public class StateMachineSpawner {
              * each new builder.build() calls "new ConcurrentTaskScheduler()"
              */
             builder.configureConfiguration()
-                    // uncomment to enable custom executor
-                    .withConfiguration().machineId("Test-" + i)
+                    .withConfiguration()
+                    .machineId("Test-" + i)
                     /* (2)
                      * So we MUST configure manually, but we need singleton , so need to inject BEAN
                      */
-                    .taskScheduler(scheduler)
-            ;
+                    .taskScheduler(scheduler);
+
 
             builder.configureStates()
                     .withStates()
                     .initial(StateMachineConfig.States.START)
-                    .state(StateMachineConfig.States.START, startAction)
+                    .state(StateMachineConfig.States.START)
+                    .state(StateMachineConfig.States.INTERMEDIATE)
+                    .state(StateMachineConfig.States.STOP)
                     .end(StateMachineConfig.States.STOP);
 
             builder.configureTransitions()
                     .withExternal()
-                    .source(StateMachineConfig.States.START).target(StateMachineConfig.States.START).timer(1000);
+                    .source(StateMachineConfig.States.START)
+                    .target(StateMachineConfig.States.START)
+                    .action(startAction)
+                    .timer(10000)
+
+                    .and()
+                    .withExternal()
+                    .source(StateMachineConfig.States.START)
+                    .target(StateMachineConfig.States.INTERMEDIATE)
+                    .event(StateMachineConfig.Events.GO1)
+
+                    .and()
+                    .withExternal()
+                    .source(StateMachineConfig.States.INTERMEDIATE)
+                    .target(StateMachineConfig.States.INTERMEDIATE)
+                    .timer(30000)
+                    .action(intermediateAction)
+
+                    .and()
+                    .withExternal()
+                    .source(StateMachineConfig.States.INTERMEDIATE)
+                    .target(StateMachineConfig.States.STOP)
+                    .event(StateMachineConfig.Events.GO2)
+
+                    .and()
+                    .withInternal()
+                    .source(StateMachineConfig.States.STOP)
+                    .action(stopAction);
+
+
             StateMachine stateMachine = builder.build();
             stateMachine.start();
         }
     }
 }
+
+
